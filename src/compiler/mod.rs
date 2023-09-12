@@ -1,41 +1,45 @@
 use miette::Diagnostic;
 use thiserror::Error;
 
-use self::source::{EntryContext, FileLoader, SourceContext, SourceError, SourceMap};
+use self::{
+    lexer::Lexer,
+    source::{EntryContext, FileLoader, SourceContext, SourceError, SourceMap},
+};
 
-pub mod parse;
+mod lexer;
 pub mod source;
 
 pub struct Compiler {
-    /// The entry point of the program.
-    entry: String,
-
     /// The source map.
     source_map: SourceMap,
 }
 
 #[derive(Debug, Error, Diagnostic)]
 pub enum CompileError {
-    #[error(transparent)]
-    #[diagnostic(transparent)]
+    #[error("Error loading source")]
     Source(#[from] SourceError),
 }
 
 impl Compiler {
     pub fn new() -> Self {
         Self {
-            entry: "main.dek".to_string(),
             source_map: SourceMap::new(FileLoader::new(".")),
         }
     }
 
-    pub fn compile(mut self) -> Result<(), CompileError> {
-        let mut cx = SourceContext::new();
-        cx.extensions_mut().insert(EntryContext);
+    pub fn compile(&mut self, entry: impl AsRef<str>) -> Result<(), CompileError> {
+        self._compile(entry.as_ref())
+    }
 
-        let source = self.source_map.load(&cx, &self.entry)?;
+    fn _compile(&mut self, entry: &str) -> Result<(), CompileError> {
+        let mut source_cx = SourceContext::new();
+        source_cx.extensions_mut().insert(EntryContext);
 
-        println!("Loaded: {:?}", source);
+        let source = self.source_map.load(&source_cx, entry)?;
+
+        for token in Lexer::new().lex(source) {
+            println!("{:?}", token);
+        }
 
         Ok(())
     }

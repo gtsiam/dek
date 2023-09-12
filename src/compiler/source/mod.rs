@@ -4,13 +4,26 @@ pub use file_loader::FileLoader;
 mod source_map;
 pub use source_map::SourceMap;
 
-use core::hash::Hash;
+use core::{fmt, hash::Hash};
 use miette::Diagnostic;
+use std::ops::Range;
 use thiserror::Error;
 use type_map::concurrent::TypeMap;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-struct BytePos(u32);
+pub struct BytePos(u32);
+
+#[derive(PartialEq, Eq)]
+pub struct Span {
+    lo: BytePos,
+    hi: BytePos,
+}
+
+impl fmt::Debug for Span {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}..{}", self.lo.0, self.hi.0)
+    }
+}
 
 #[derive(Debug, Error, Diagnostic)]
 pub enum SourceError {
@@ -56,6 +69,32 @@ impl Source {
     pub fn context_mut(&mut self) -> &mut SourceContext {
         &mut self.context
     }
+
+    pub fn contents(&self) -> &str {
+        &self.contents
+    }
+
+    pub(crate) fn spanned<T>(&self, value: T, range: Range<usize>) -> Spanned<T> {
+        Spanned {
+            value,
+            span: Span {
+                lo: BytePos(self.start_pos.0 + range.start as u32),
+                hi: BytePos(self.start_pos.0 + range.end as u32),
+            },
+        }
+    }
+}
+
+impl AsRef<str> for Source {
+    fn as_ref(&self) -> &str {
+        self.contents()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Spanned<T> {
+    value: T,
+    span: Span,
 }
 
 #[derive(Debug)]
@@ -72,6 +111,12 @@ impl SourceContext {
 
     pub fn extensions_mut(&mut self) -> &mut TypeMap {
         &mut self.0
+    }
+}
+
+impl Default for SourceContext {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

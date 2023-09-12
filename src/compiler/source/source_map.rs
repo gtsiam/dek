@@ -47,7 +47,7 @@ impl SourceMap {
         match self.sources.entry(source_key) {
             Entry::Occupied(entry) => Ok(entry.into_mut()),
             Entry::Vacant(entry) => {
-                let mut source = self.source_loader.load(&context, &*entry.key().key)?;
+                let mut source = self.source_loader.load(context, &*entry.key().key)?;
 
                 // If both start_pos and (start_pos + source_len) are valid `u32`s, we know that no span
                 // computation will overflow. So we're safe to assign the source's start_pos and continue.
@@ -74,7 +74,6 @@ impl SourceMap {
     }
 }
 
-#[derive(Hash)]
 struct SourceMapKey {
     loader: TypeId,
     key: Box<dyn DynKey>,
@@ -82,7 +81,14 @@ struct SourceMapKey {
 
 impl PartialEq for SourceMapKey {
     fn eq(&self, other: &Self) -> bool {
-        self.loader == other.loader && &*self.key == &*other.key
+        self.loader == other.loader && *self.key == *other.key
+    }
+}
+
+impl Hash for SourceMapKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.loader.hash(state);
+        self.key.hash(state);
     }
 }
 

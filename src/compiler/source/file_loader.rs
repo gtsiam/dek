@@ -55,7 +55,7 @@ impl SourceLoader for FileLoader {
             base = Some(&cx.path);
         }
 
-        if let Some(_) = cx.extensions().get::<EntryContext>() {
+        if let Some(_cx) = cx.extensions().get::<EntryContext>() {
             base = Some(&self.base_path);
         }
 
@@ -64,7 +64,7 @@ impl SourceLoader for FileLoader {
     }
 
     fn load(&mut self, _cx: &SourceContext, key: &Self::Key) -> Result<Source, Self::Error> {
-        let contents = std::fs::read_to_string(&key).map_err(|err| FileLoaderError::IO {
+        let contents = std::fs::read_to_string(key).map_err(|err| FileLoaderError::IO {
             err,
             path: key.clone(),
         })?;
