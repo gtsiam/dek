@@ -1,4 +1,5 @@
 mod file_loader;
+pub mod lexer;
 pub use file_loader::FileLoader;
 
 mod source_map;
@@ -6,9 +7,10 @@ pub use source_map::SourceMap;
 
 use core::{fmt, hash::Hash};
 use miette::Diagnostic;
-use std::ops::Range;
 use thiserror::Error;
 use type_map::concurrent::TypeMap;
+
+use self::lexer::Lexer;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct BytePos(u32);
@@ -74,14 +76,8 @@ impl Source {
         &self.contents
     }
 
-    pub(crate) fn spanned<T>(&self, value: T, range: Range<usize>) -> Spanned<T> {
-        Spanned {
-            value,
-            span: Span {
-                lo: BytePos(self.start_pos.0 + range.start as u32),
-                hi: BytePos(self.start_pos.0 + range.end as u32),
-            },
-        }
+    pub fn lexer(&self) -> Lexer<'_> {
+        Lexer::new(self.start_pos.0, self.contents.as_str())
     }
 }
 

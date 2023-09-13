@@ -1,0 +1,40 @@
+use crate::compiler::{
+    ast::*,
+    source::lexer::{Token, TokenError}
+};
+use malachite::Rational;
+use std::sync::Arc;
+
+grammar<'s>;
+
+extern {
+    type Location = u32;
+    type Error = TokenError;
+
+    enum Token<'s> {
+        "+" => Token::Plus,
+        "-" => Token::Dash,
+        "*" => Token::Star,
+        "/" => Token::Slash,
+        "(" => Token::LParen,
+        ")" => Token::RParen,
+        "num" => Token::Number(<Rational>),
+    }
+}
+
+pub Expr: Expr = {
+    <l:Expr> "+" <r:Factor> => Expr::bin_op(Function::identity(), l, r),
+    <l:Expr> "-" <r:Factor> => Expr::bin_op(Function::identity(), l, r),
+    Factor,
+}
+
+Factor: Expr = {
+    <l:Factor> "*" <r:Term> => Expr::bin_op(Function::identity(), l, r),
+    <l:Factor> "/" <r:Term> => Expr::bin_op(Function::identity(), l, r),
+    Term,
+}
+
+Term: Expr = {
+    <value:"num"> => Expr{ kind: Arc::new(ExprKind::NumberLit(NumberLit { value })) },
+    "(" <Term> ")",
+}

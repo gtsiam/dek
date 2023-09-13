@@ -6,9 +6,7 @@ use malachite::{
 use miette::Diagnostic;
 use thiserror::Error;
 
-use super::source::{Source, Spanned};
-
-#[derive(Debug, Logos)]
+#[derive(Debug, Clone, Logos)]
 #[logos(error = TokenError)]
 #[logos(skip r"[ \t\r\n\f]+")]
 pub enum Token<'s> {
@@ -22,10 +20,22 @@ pub enum Token<'s> {
     Plus,
 
     #[token("-")]
-    Minus,
+    Dash,
+
+    #[token("*")]
+    Star,
+
+    #[token("/")]
+    Slash,
 
     #[token(".")]
     Dot,
+
+    #[token("(")]
+    LParen,
+
+    #[token(")")]
+    RParen,
 
     #[token("{")]
     LBrace,
@@ -48,25 +58,21 @@ pub enum Token<'s> {
     #[regex( // Binary
         r#"0b[01][01_]*"#,
         |lex| parse_number(&lex.slice()[2..], 2),
-        priority = 4,
         ignore(ascii_case)
     )]
     #[regex( // Octal
         r#"0o[0-7][0-7_]*"#,
         |lex| parse_number(&lex.slice()[2..], 8),
-        priority = 3,
         ignore(ascii_case)
     )]
     #[regex( // Hexadecimal
         r#"0x[0-9a-f][0-9a-f_]*"#,
         |lex| parse_number(&lex.slice()[2..], 16),
-        priority = 2,
         ignore(ascii_case)
     )]
     #[regex( // Decimal (with scientific notation)
         r#"[+-]?[0-9][0-9]*(\.[0-9_]+)?([eE][+-]?[0-9_]+)?"#,
         |lex| parse_number(lex.slice(), 10),
-        priority = 1,
         ignore(ascii_case)
     )]
     Number(Rational),
@@ -93,28 +99,34 @@ impl PartialEq for TokenError {
 
 impl Eq for TokenError {}
 
-pub struct Lexer {
-    _priv: (),
+pub struct Lexer<'s> {
+    span_offset: u32,
+    inner: logos::Lexer<'s, Token<'s>>,
 }
 
-impl Lexer {
-    pub fn new() -> Self {
-        Self { _priv: () }
-    }
-
-    pub fn lex<'s>(
-        &self,
-        source: &'s Source,
-    ) -> impl Iterator<Item = Spanned<Result<Token<'s>, TokenError>>> + 's {
-        Token::lexer(source.contents())
-            .spanned()
-            .map(|(token, range)| source.spanned(token, range))
+impl<'s> Lexer<'s> {
+    pub(super) fn new(span_offset: u32, source: &'s str) -> Self {
+        Self {
+            span_offset,
+            inner: Token::lexer(source),
+        }
     }
 }
 
-impl Default for Lexer {
-    fn default() -> Self {
-        Self::new()
+impl<'s> Iterator for Lexer<'s> {
+    type Item = Result<(u32, Token<'s>, u32), TokenError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = self.inner.next()?;
+        let span = self.inner.span();
+
+        Some(token.map(|token| {
+            (
+                self.span_offset + span.start as u32,
+                token,
+                self.span_offset + span.end as u32,
+            )
+        }))
     }
 }
 

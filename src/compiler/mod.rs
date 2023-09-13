@@ -1,12 +1,12 @@
+use lalrpop_util::lalrpop_mod;
 use miette::Diagnostic;
 use thiserror::Error;
 
-use self::{
-    lexer::Lexer,
-    source::{EntryContext, FileLoader, SourceContext, SourceError, SourceMap},
-};
+lalrpop_mod!(grammar, "/compiler/grammar.rs");
 
-mod lexer;
+use self::source::{EntryContext, FileLoader, SourceContext, SourceError, SourceMap};
+
+pub mod ast;
 pub mod source;
 
 pub struct Compiler {
@@ -37,9 +37,9 @@ impl Compiler {
 
         let source = self.source_map.load(&source_cx, entry)?;
 
-        for token in Lexer::new().lex(source) {
-            println!("{:?}", token);
-        }
+        let ast = grammar::ExprParser::new().parse(source.lexer());
+
+        let _ = dbg!(ast);
 
         Ok(())
     }
