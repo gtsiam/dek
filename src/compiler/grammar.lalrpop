@@ -2,8 +2,8 @@ use crate::compiler::{
     ast::*,
     source::lexer::{Token, TokenError}
 };
+use crate::vm::value::Value;
 use malachite::Rational;
-use std::sync::Arc;
 
 grammar<'s>;
 
@@ -18,23 +18,73 @@ extern {
         "/" => Token::Slash,
         "(" => Token::LParen,
         ")" => Token::RParen,
+        "{" => Token::LBrace,
+        "}" => Token::RBrace,
+        "[" => Token::LBracket,
+        "]" => Token::RBracket,
+        "=" => Token::Assign,
+        "." => Token::Dot,
+        "," => Token::Comma,
+        "not" => Token::Not,
+        "and" => Token::And,
+        "or" => Token::Or,
+        "true" => Token::True,
+        "false" => Token::False,
+        "null" => Token::Null,
+        "let" => Token::Let,
+        "in" => Token::In,
+        "ident" => Token::Ident(<&'s str>),
         "num" => Token::Number(<Rational>),
     }
 }
 
-pub Expr: Expr = {
-    <l:Expr> "+" <r:Factor> => Expr::bin_op(Function::identity(), l, r),
-    <l:Expr> "-" <r:Factor> => Expr::bin_op(Function::identity(), l, r),
-    Factor,
-}
-
-Factor: Expr = {
-    <l:Factor> "*" <r:Term> => Expr::bin_op(Function::identity(), l, r),
-    <l:Factor> "/" <r:Term> => Expr::bin_op(Function::identity(), l, r),
-    Term,
-}
+pub Expr = Term;
 
 Term: Expr = {
-    <value:"num"> => Expr{ kind: Arc::new(ExprKind::NumberLit(NumberLit { value })) },
-    "(" <Term> ")",
+    #[precedence(level="4")]
+    "let" Comma<Assignment> "in" <Term>,
+
+    #[precedence(level="3")] #[assoc(side="left")]
+    <l:Term> "+" <r:Term> => Expr::bin_op(Expr::todo(), l, r),
+    #[precedence(level="3")] #[assoc(side="left")]
+    <l:Term> "-" <r:Term> => Expr::bin_op(Expr::todo(), l, r),
+
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:Term> "*" <r:Term> => Expr::bin_op(Expr::todo(), l, r),
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:Term> "/" <r:Term> => Expr::bin_op(Expr::todo(), l, r),
+
+    #[precedence(level="1")] #[assoc(side="left")]
+    Term Term => Expr::call(<>),
+
+    #[precedence(level="0")]
+    Atom,
+}
+
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+Assignment = "ident" "=" Expr;
+
+Atom: Expr = {
+    "ident" => Expr::todo(),
+
+    "num" => Expr::literal(Value::number(<>)),
+
+    "true" => Expr::literal(Value::boolean(true)),
+    "false" => Expr::literal(Value::boolean(false)),
+
+    "null" => Expr::literal(Value::null()),
+
+    "{" Comma<Assignment> "}" => Expr::todo(),
+    "[" Comma<Expr> "]" => Expr::todo(),
+
+    "(" <Expr> ")",
 }

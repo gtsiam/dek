@@ -1,18 +1,29 @@
-use core::fmt;
-use std::sync::Arc;
+use std::fmt;
 
-use malachite::Rational;
+use crate::vm::value::Value;
 
-#[derive(Debug)]
+use super::{interner::Interned, symbol::Symbol};
+
 pub enum ExprKind {
-    NumberLit(NumberLit),
-    FunctionCall(FunctionCall),
-    Function(Function),
+    Literal(Value),
+    Identifier(Identifier),
+    Call(Call),
+    Todo,
 }
 
-#[derive(Clone)]
+impl fmt::Debug for ExprKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Literal(v) => fmt::Debug::fmt(&v, f),
+            Self::Identifier(v) => fmt::Debug::fmt(&v, f),
+            Self::Call(v) => fmt::Debug::fmt(&v, f),
+            Self::Todo => write!(f, "Todo"),
+        }
+    }
+}
+
 pub struct Expr {
-    pub kind: Arc<ExprKind>,
+    pub kind: ExprKind,
 }
 
 impl fmt::Debug for Expr {
@@ -23,47 +34,57 @@ impl fmt::Debug for Expr {
 
 impl Expr {
     pub fn new(kind: ExprKind) -> Self {
-        Self {
-            kind: Arc::new(kind),
-        }
+        Self { kind }
+    }
+
+    pub fn todo() -> Self {
+        Self::new(ExprKind::Todo)
+    }
+
+    pub fn literal(lit: Value) -> Self {
+        Self::new(ExprKind::Literal(lit))
+    }
+
+    pub fn call(fun: Expr, arg: Expr) -> Self {
+        Self::new(ExprKind::Call(Call::new(fun, arg)))
     }
 
     pub fn bin_op(fun: Expr, left: Expr, right: Expr) -> Self {
-        Expr::new(ExprKind::FunctionCall(FunctionCall {
-            fun: Expr::new(ExprKind::FunctionCall(FunctionCall { fun, arg: left })),
-            arg: right,
-        }))
+        Expr::call(Expr::call(fun, left), right)
     }
 }
 
-#[derive(Debug)]
-pub struct NumberLit {
-    pub value: Rational,
+pub struct Call {
+    pub fun: Box<Expr>,
+    pub arg: Box<Expr>,
 }
 
-#[derive(Debug)]
-pub struct FunctionCall {
-    pub fun: Expr,
-    pub arg: Expr,
-}
-
-pub struct Function {
-    pub name: String,
-    pub body: Box<dyn Fn(&Expr) -> Expr + Send + Sync>,
-}
-
-impl Function {
-    pub fn identity() -> Expr {
-        Expr::new(ExprKind::Function(Self {
-            name: "identity".to_string(),
-            body: Box::new(|expr| expr.clone()),
-        }))
-    }
-}
-
-impl fmt::Debug for Function {
+impl fmt::Debug for Call {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<function {}>", self.name)
+        f.write_str("(")?;
+        fmt::Debug::fmt(&self.fun, f)?;
+        f.write_str(" ")?;
+        fmt::Debug::fmt(&self.arg, f)?;
+        f.write_str(")")
+    }
+}
+
+impl Call {
+    pub fn new(fun: Expr, arg: Expr) -> Self {
+        Self {
+            fun: Box::new(fun),
+            arg: Box::new(arg),
+        }
+    }
+}
+
+pub struct Identifier {
+    pub name: Interned<Symbol>,
+}
+
+impl fmt::Debug for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.name, f)
     }
 }
 
@@ -71,8 +92,5 @@ impl fmt::Debug for Function {
 mod tests {
     use super::*;
 
-    const _: () = {
-        const fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<Expr>();
-    };
+    static_assertions::assert_impl_all!(Expr: Send, Sync);
 }

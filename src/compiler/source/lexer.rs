@@ -31,6 +31,9 @@ pub enum Token<'s> {
     #[token(".")]
     Dot,
 
+    #[token(",")]
+    Comma,
+
     #[token("(")]
     LParen,
 
@@ -55,6 +58,24 @@ pub enum Token<'s> {
     #[token("in")]
     In,
 
+    #[token("not")]
+    Not,
+
+    #[token("and")]
+    And,
+
+    #[token("or")]
+    Or,
+
+    #[token("true")]
+    True,
+
+    #[token("false")]
+    False,
+
+    #[token("null")]
+    Null,
+
     #[regex( // Binary
         r#"0b[01][01_]*"#,
         |lex| parse_number(&lex.slice()[2..], 2),
@@ -78,7 +99,7 @@ pub enum Token<'s> {
     Number(Rational),
 
     #[regex(r#"[a-z_][a-z0-9_]*"#, ignore(ascii_case))]
-    Identifier(&'s str),
+    Ident(&'s str),
 }
 
 #[derive(Debug, Clone, Error, Diagnostic, Default)]

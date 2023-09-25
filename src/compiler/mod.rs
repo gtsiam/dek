@@ -6,8 +6,12 @@ lalrpop_mod!(grammar, "/compiler/grammar.rs");
 
 use self::source::{EntryContext, FileLoader, SourceContext, SourceError, SourceMap};
 
+mod interner;
+
 pub mod ast;
+mod context;
 pub mod source;
+mod symbol;
 
 pub struct Compiler {
     /// The source map.
